@@ -10,6 +10,10 @@
     "build:chevrotain:types": "tsx lib/nc/chevrotain-parser/gen_dts_signature.js",
     "typecheck": "tsc --noEmit --watch"
   },
+  "files": [
+    "dist",
+    "src/step/layer/shape/text/cozette/CozetteVector.ttf"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.ts",
@@ -18,17 +22,13 @@
     "./step/layer/shape/text/cozette/CozetteVector.ttf": "./src/step/layer/shape/text/cozette/CozetteVector.ttf"
   },
   "dependencies": {
-    "@grx/parser-gdsii": "workspace:*",
     "@hpcreery/tracespace-parser": "^5.0.4",
     "@hpcreery/tracespace-plotter": "^5.0.3",
     "@hpcreery/tracespace-renderer": "^5.0.3",
-    "@mantine/core": "^7.17.8",
-    "@mantine/hooks": "^7.17.8",
     "@tracespace/parser": "^5.0.0-next.0",
     "@tracespace/plotter": "^5.0.0-alpha.0",
     "@types/unist": "^3.0.3",
     "chevrotain": "^11.0.3",
-    "chokidar": "^5.0.0",
     "comlink": "^4.4.2",
     "dxf-parser": "^1.1.2",
     "earcut": "^3.0.2",
@@ -38,7 +38,6 @@
     "react-dom": "^19.2.4",
     "regl": "^2.1.1",
     "typescript-event-target": "^1.1.1",
-    "vitest": "^4.0.18",
     "webgl-utils": "^1.0.1",
     "zod": "^4.1.12"
   },
@@ -47,6 +46,8 @@
   },
   "devDependencies": {
     "@grx/typescript-config": "workspace:*",
+    "chokidar": "^5.0.0",
+    "vitest": "^4.0.18",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/earcut": "^3.0.0",
     "@types/react": "^19.2.14",

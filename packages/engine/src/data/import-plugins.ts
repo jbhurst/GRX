@@ -1,5 +1,4 @@
 import dxfPluginWorker from "./importer/dxf?worker&inline"
-import gdsiiPluginWorker from "./importer/gdsii?worker&inline"
 import gerberPluginWorker from "./importer/gerber?worker&inline"
 import ncPluginWorker from "./importer/nc?worker&inline"
 import type { DataInterface } from "./interface"
@@ -10,10 +9,6 @@ export const importFormats = {
   "RS-274X": {
     plugin: gerberPluginWorker,
     matchFile: (ext: string) => ["gbr", "geb", "gerber"].includes(ext),
-  },
-  GDSII: {
-    plugin: gdsiiPluginWorker,
-    matchFile: (ext: string) => ["gds", "gdsii", "gds2"].includes(ext),
   },
   DXF: {
     plugin: dxfPluginWorker,

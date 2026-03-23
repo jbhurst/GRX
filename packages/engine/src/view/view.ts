@@ -914,7 +914,7 @@ export class ViewRenderer extends UpdateEventTarget {
    * @param point vec2 of gl screen/view coordinates
    */
   public updateMeasurement(point: vec2): void {
-    const coord = this.getWorldCoordFromScreenCoord(point[0], point[1], 0)
+    const coord = this.snap(point)
     this.measurements.updateMeasurement(coord)
     this.announceUpdate()
   }

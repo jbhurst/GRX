@@ -3,7 +3,7 @@ import type { DataInterface } from "./data/interface"
 import cozetteFont from "./data/shape/text/cozette/CozetteVector.ttf?url"
 import { fontInfo as cozetteFontInfo } from "./data/shape/text/cozette/font"
 import type { Engine, QuerySelection } from "./engine"
-import EngineWorker from "./engine?worker"
+import EngineWorker from "./engine?worker&inline"
 import { PointerMode } from "./types"
 import { UID } from "./utils"
 
@@ -247,6 +247,26 @@ export class Renderer {
 
     await engine.interface.update_view_box_from_dom_rect(element.id, element.getBoundingClientRect())
 
+    // Track the canvas start point of the current measurement for angle constraint
+    let measureStartCanvas: [number, number] | null = null
+
+    /**
+     * Constrain a point to the nearest 45-degree angle from the start point.
+     * Used when Shift is held during measurement.
+     */
+    function constrainAngle(start: [number, number], end: [number, number]): [number, number] {
+      const dx = end[0] - start[0]
+      const dy = end[1] - start[1]
+      const angle = Math.atan2(dy, dx)
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      // Snap to nearest 45-degree increment
+      const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4)
+      return [
+        start[0] + dist * Math.cos(snapped),
+        start[1] + dist * Math.sin(snapped),
+      ]
+    }
+
     element.style.cursor = "grab"
 
     element.onwheel = async (e): Promise<void> => {
@@ -282,11 +302,16 @@ export class Renderer {
         element.style.cursor = "crosshair"
       } else if (this.pointerSettings.mode === PointerMode.MEASURE) {
         element.style.cursor = "crosshair"
-        const [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
+        let [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
         const currentMeasurement = await engine.interface.read_view_current_measurement(element.id)
         if (currentMeasurement != null) {
+          if (e.shiftKey && measureStartCanvas) {
+            ;[xcanvas, ycanvas] = constrainAngle(measureStartCanvas, [xcanvas, ycanvas])
+          }
           engine.interface.finish_view_measurement(element.id, [xcanvas, ycanvas])
+          measureStartCanvas = null
         } else {
+          measureStartCanvas = [xcanvas, ycanvas]
           engine.interface.create_view_measurement(element.id, [xcanvas, ycanvas])
         }
       }
@@ -324,7 +349,10 @@ export class Renderer {
 
       if (this.pointerSettings.mode === PointerMode.MEASURE) {
         element.style.cursor = "crosshair"
-        const [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
+        let [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
+        if (e.shiftKey && measureStartCanvas) {
+          ;[xcanvas, ycanvas] = constrainAngle(measureStartCanvas, [xcanvas, ycanvas])
+        }
         engine.interface.update_view_measurement(element.id, [xcanvas, ycanvas])
       }
 
