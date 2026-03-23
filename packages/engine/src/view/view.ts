@@ -852,7 +852,7 @@ export class ViewRenderer extends UpdateEventTarget {
     this.transform.velocity = vec2.fromValues(0, 0)
     this.transform.rotation = vec2.fromValues(0, 0)
     for (const layer of this.layers) {
-      // TODO: make for loop parallel
+      if (!layer.visible) continue
       const layerBoundingBox = layer.getBoundingBox()
       boundingBox.min = vec2.min(boundingBox.min, boundingBox.min, layerBoundingBox.min)
       boundingBox.max = vec2.max(boundingBox.max, boundingBox.max, layerBoundingBox.max)
@@ -865,20 +865,17 @@ export class ViewRenderer extends UpdateEventTarget {
 
     const zoomX = viewWidth / layerWidth
     const zoomY = viewHeight / layerHeight
-    let zoom = Math.min(zoomX, zoomY) * 1.0 // add some padding
+    let zoom = Math.min(zoomX, zoomY) * 0.9 // 10% padding to avoid edge clipping
     if (zoom > settings.MAX_ZOOM) zoom = settings.MAX_ZOOM
     if (zoom < settings.MIN_ZOOM) zoom = settings.MIN_ZOOM
 
-    const position = vec2.create()
-    if (zoomX < zoomY) {
-      // fit to width
-      const centerY = viewHeight / 2 + ((boundingBox.min[1] + boundingBox.max[1]) / 2) * zoom
-      vec2.set(position, boundingBox.min[0] * zoom, centerY)
-    } else {
-      // fit to height
-      const centerX = viewWidth / 2 - ((boundingBox.min[0] + boundingBox.max[0]) / 2) * zoom
-      vec2.set(position, centerX, viewHeight - boundingBox.min[1] * zoom)
-    }
+    // Center the board on both axes
+    const boardCenterX = (boundingBox.min[0] + boundingBox.max[0]) / 2
+    const boardCenterY = (boundingBox.min[1] + boundingBox.max[1]) / 2
+    const position = vec2.fromValues(
+      viewWidth / 2 - boardCenterX * zoom,
+      viewHeight / 2 + boardCenterY * zoom,
+    )
 
     // validation checks
     if (Number.isNaN(boundingBox.min[0]) || Number.isNaN(boundingBox.min[1]) || Number.isNaN(boundingBox.max[0]) || Number.isNaN(boundingBox.max[1]))
