@@ -1,6 +1,12 @@
 {
   "name": "@grx/engine",
   "version": "0.0.1",
+  "license": "MIT",
+  "author": "Hunter Creery",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hpcreery/GRX"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite dev --config vite.demo.config.ts",
