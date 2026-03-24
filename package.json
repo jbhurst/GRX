@@ -5,6 +5,7 @@
   "author": "Hunter Creery",
   "homepage": "https://github.com/hpcreery/GRX/blob/master/README.md",
   "private": true,
+  "_TODO_scripts": "typecheck uses --watch (hangs in CI); lint/check use --write (mutates in CI). Add read-only CI variants.",
   "scripts": {
     "prepare": "husky",
     "dev": "turbo watch dev",

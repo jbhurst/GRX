@@ -711,7 +711,7 @@ export class ViewRenderer extends UpdateEventTarget {
         height: 1,
       })
       if (data.reduce((acc, val) => acc + val, 0) > 0) {
-        console.log(layer.dataLayer.layer.name)
+        // console.log(layer.dataLayer.layer.name)
       }
     }
   }

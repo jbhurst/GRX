@@ -41,6 +41,7 @@ export const RecordDefinitions: { [key: number]: RecordDefinition } = {
     name: "BGNLIB",
     dataType: DataType.TwoByteSignedInteger,
     description: "Library begin, last modification date and time",
+    // TODO: No bounds checking — malformed GDSII files with short data arrays will silently produce NaN/undefined
     parse: (state, data: number[]) => {
       const year = data[2]
       const month = data[3]
@@ -48,7 +49,7 @@ export const RecordDefinitions: { [key: number]: RecordDefinition } = {
       const hour = data[5]
       const minute = data[6]
       const second = data[7]
-      const date = new Date(year, month, day, hour, minute, second)
+      const date = new Date(year, month - 1, day, hour, minute, second)
       state.bnf.BGNLIB = {
         lastModificationDate: date,
         lastAccessDate: date,
@@ -93,7 +94,7 @@ export const RecordDefinitions: { [key: number]: RecordDefinition } = {
       const hour = data[5]
       const minute = data[6]
       const second = data[7]
-      const date = new Date(year, month, day, hour, minute, second)
+      const date = new Date(year, month - 1, day, hour, minute, second)
       state.cell.BGNSTR = {
         lastModificationDate: date,
         lastAccessDate: date,

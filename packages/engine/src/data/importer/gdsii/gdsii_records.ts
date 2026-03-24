@@ -48,7 +48,7 @@ export const RecordDefinitions: { [key: number]: RecordDefinition } = {
       const hour = data[5]
       const minute = data[6]
       const second = data[7]
-      const date = new Date(year, month, day, hour, minute, second)
+      const date = new Date(year, month - 1, day, hour, minute, second)
       state.bnf.BGNLIB = {
         lastModificationDate: date,
         lastAccessDate: date,
@@ -93,7 +93,7 @@ export const RecordDefinitions: { [key: number]: RecordDefinition } = {
       const hour = data[5]
       const minute = data[6]
       const second = data[7]
-      const date = new Date(year, month, day, hour, minute, second)
+      const date = new Date(year, month - 1, day, hour, minute, second)
       state.cell.BGNSTR = {
         lastModificationDate: date,
         lastAccessDate: date,

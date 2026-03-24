@@ -6,6 +6,8 @@ export const [spotlightStore, spotlight]: readonly [MantineStore<SpotlightState>
 
 export const actionsBase: SpotlightActionData[] = []
 
+// TODO: Proxy-based array deduplication is a non-standard React pattern — mutations are implicit and hard to debug.
+// Consider replacing with a proper state management approach.
 export const actions = new Proxy(actionsBase, {
   get(target, prop): SpotlightActionData | ((...t: SpotlightActionData[]) => number) {
     if (prop === "push") {

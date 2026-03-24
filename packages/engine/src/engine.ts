@@ -507,7 +507,7 @@ export abstract class Engine {
 
     const gl = offscreenCanvasGL.getContext("webgl", attributes)!
 
-    console.log("WEBGL VERSION", gl.getParameter(gl.VERSION))
+    // console.log("WEBGL VERSION", gl.getParameter(gl.VERSION))
 
     Engine.regl = REGL({
       gl,
@@ -524,7 +524,7 @@ export abstract class Engine {
       ],
       profile: true,
     })
-    console.log("WEBGL LIMITS", Engine.regl.limits)
+    // console.log("WEBGL LIMITS", Engine.regl.limits)
 
     initStaticShaderCollections(Engine.regl)
     initializeRenderers(Engine.regl)
@@ -536,11 +536,11 @@ export abstract class Engine {
     Engine.universe = Engine.regl({})
 
     Engine.render()
-    console.log("Render Engine Initialized")
+    // console.log("Render Engine Initialized")
   }
 
   public static onLoad(): void {
-    console.log("Engine onLoad called")
+    // console.log("Engine onLoad called")
   }
 
   public static render(): void {

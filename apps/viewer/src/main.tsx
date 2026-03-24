@@ -5,6 +5,7 @@ import { Spotlight } from "@mantine/spotlight"
 import { ContextMenuProvider } from "mantine-contextmenu"
 import ReactDOM from "react-dom/client"
 import App from "./App"
+import ErrorBoundary from "./components/ErrorBoundary"
 import { actions, spotlightStore } from "./contexts/Spotlight"
 import { ThemeConfigProvider } from "./contexts/ThemeContext"
 
@@ -52,7 +53,9 @@ function Main(): JSX.Element | null {
         <ContextMenuProvider zIndex={1000} shadow="md" borderRadius="md">
           <Spotlight store={spotlightStore} actions={actions} shortcut={["/"]} />
           <Notifications />
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
           {/* <DemoApp /> */}
           {/* <NCDemo /> */}
         </ContextMenuProvider>

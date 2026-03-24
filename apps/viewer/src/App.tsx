@@ -15,6 +15,8 @@ import Toolbar from "./components/toolbar/Toolbar"
 import { EditorConfigProvider, menuItems } from "./contexts/EditorContext"
 import { ThemeConfigProvider } from "./contexts/ThemeContext"
 
+// TODO: Hardcoded "main" is used throughout the viewer (LayerListItem, FeatureSidebar, Toolbar, LayerTransform).
+// Should use project.name/project.stepName from context consistently to support multiple views/projects.
 const PROJECT_NAME = "main"
 const STEP_NAME = "main"
 
@@ -67,8 +69,7 @@ export default function App(): JSX.Element | null {
   // Update the background color of the render engine
   useEffect(() => {
     setEngineBackgroundColor()
-    // removed this use effect deps to ensure background color was set in setup
-  })
+  }, [colors.colorScheme, theme, renderer])
 
   const [units, setUnits] = useLocalStorage<types.Units>({
     key: "units",

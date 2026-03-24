@@ -1,10 +1,16 @@
 import type { Layer, StepLayer } from "@src/data/project"
-import { vec3 } from "gl-matrix"
+import { type mat3, type mat4, vec3 } from "gl-matrix"
 import type REGL from "regl"
 import { ShapeRenderer, type ShapeRendererProps } from "./shape-renderer"
 import type { WorldContext } from "./view"
-// import { settings } from '../settings'
-// import { ColorBlend } from '../types'
+
+function typedArrayEquals(a: mat3 | mat4 | Float32Array, b: mat3 | mat4 | Float32Array): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
 
 export interface LayerProps {
   dataLayer: StepLayer
@@ -33,10 +39,13 @@ export default class LayerRenderer extends ShapeRenderer {
 
   public framebuffer: REGL.Framebuffer2D
 
-  private previousContextString = ""
-  private previousTransformString = ""
-  private previousColorString = ""
   private artworkChanged = false
+  private prevViewportWidth = -1
+  private prevViewportHeight = -1
+  private prevZOffset = NaN
+  private prevTransformMatrix: mat3 | null = null
+  private prevLayerMatrix: mat3 | null = null
+  private prevColor: vec3 = vec3.fromValues(NaN, NaN, NaN)
 
   constructor(props: LayerRendererProps) {
     const image = props.dataLayer.artwork
@@ -62,13 +71,8 @@ export default class LayerRenderer extends ShapeRenderer {
         func: "greater",
         range: [0, 1],
       },
-      // cull: {
-      //   enable: true,
-      //   face: 'back'
-      // },
       uniforms: {
         u_Color: () => this.color,
-        // u_Color: () => settings.COLOR_BLEND == ColorBlend.OPAQUE ? vec3.fromValues(1,1,1) : this.color,
         u_Alpha: () => this.alpha,
         u_ZOffset: (context) => context.zOffset || 0.0,
       },
@@ -80,24 +84,30 @@ export default class LayerRenderer extends ShapeRenderer {
   }
 
   private needsRender(context: REGL.DefaultContext & WorldContext): boolean {
-    const contextCopy = JSON.parse(JSON.stringify(context))
-    const transformCopy = JSON.parse(JSON.stringify(this.transform))
-    delete contextCopy["tick"]
-    delete contextCopy["time"]
-    const contextCopyStr = JSON.stringify(contextCopy)
-    const transformCopyStr = JSON.stringify(transformCopy)
-    const colorCopyStr = JSON.stringify(this.color)
-    if (
-      this.previousContextString == contextCopyStr &&
-      !this.artworkChanged &&
-      this.previousTransformString == transformCopyStr &&
-      this.previousColorString == colorCopyStr
-    ) {
+    const colorChanged =
+      this.color[0] !== this.prevColor[0] ||
+      this.color[1] !== this.prevColor[1] ||
+      this.color[2] !== this.prevColor[2]
+    const contextChanged =
+      context.viewportWidth !== this.prevViewportWidth ||
+      context.viewportHeight !== this.prevViewportHeight ||
+      context.zOffset !== this.prevZOffset ||
+      this.prevTransformMatrix === null ||
+      !typedArrayEquals(context.transformMatrix, this.prevTransformMatrix)
+    const transformChanged =
+      this.prevLayerMatrix === null ||
+      !typedArrayEquals(this.transform.matrix, this.prevLayerMatrix)
+
+    if (!this.artworkChanged && !colorChanged && !contextChanged && !transformChanged) {
       return false
     }
-    this.previousContextString = contextCopyStr
-    this.previousTransformString = transformCopyStr
-    this.previousColorString = colorCopyStr
+
+    this.prevViewportWidth = context.viewportWidth
+    this.prevViewportHeight = context.viewportHeight
+    this.prevZOffset = context.zOffset
+    this.prevTransformMatrix = Float32Array.from(context.transformMatrix) as unknown as mat3
+    this.prevLayerMatrix = Float32Array.from(this.transform.matrix) as unknown as mat3
+    vec3.copy(this.prevColor, this.color)
     this.artworkChanged = false
     return true
   }
@@ -135,9 +145,12 @@ export class SelectionRenderer extends ShapeRenderer {
 
   public sourceLayer: Layer
 
-  private previousContextString = ""
-  private previousTransformString = ""
   private artworkChanged = false
+  private prevViewportWidth = -1
+  private prevViewportHeight = -1
+  private prevZOffset = NaN
+  private prevTransformMatrix: mat3 | null = null
+  private prevLayerMatrix: mat3 | null = null
 
   constructor(props: SelectionRendererProps) {
     super(props)
@@ -152,10 +165,6 @@ export class SelectionRenderer extends ShapeRenderer {
         func: "greater",
         range: [0, 1],
       },
-      // cull: {
-      //   enable: true,
-      //   face: 'back'
-      // },
       uniforms: {
         u_Color: vec3.fromValues(0.5, 0.5, 0.5),
         u_Alpha: 0.7,
@@ -169,17 +178,25 @@ export class SelectionRenderer extends ShapeRenderer {
   }
 
   private needsRender(context: REGL.DefaultContext & WorldContext): boolean {
-    const contextCopy = JSON.parse(JSON.stringify(context))
-    const transformCopy = JSON.parse(JSON.stringify(this.transform))
-    delete contextCopy["tick"]
-    delete contextCopy["time"]
-    const contextCopyStr = JSON.stringify(contextCopy)
-    const transformCopyStr = JSON.stringify(transformCopy)
-    if (this.previousContextString == contextCopyStr && !this.artworkChanged && this.previousTransformString == transformCopyStr) {
+    const contextChanged =
+      context.viewportWidth !== this.prevViewportWidth ||
+      context.viewportHeight !== this.prevViewportHeight ||
+      context.zOffset !== this.prevZOffset ||
+      this.prevTransformMatrix === null ||
+      !typedArrayEquals(context.transformMatrix, this.prevTransformMatrix)
+    const transformChanged =
+      this.prevLayerMatrix === null ||
+      !typedArrayEquals(this.transform.matrix, this.prevLayerMatrix)
+
+    if (!this.artworkChanged && !contextChanged && !transformChanged) {
       return false
     }
-    this.previousContextString = contextCopyStr
-    this.previousTransformString = transformCopyStr
+
+    this.prevViewportWidth = context.viewportWidth
+    this.prevViewportHeight = context.viewportHeight
+    this.prevZOffset = context.zOffset
+    this.prevTransformMatrix = Float32Array.from(context.transformMatrix) as unknown as mat3
+    this.prevLayerMatrix = Float32Array.from(this.transform.matrix) as unknown as mat3
     this.artworkChanged = false
     return true
   }

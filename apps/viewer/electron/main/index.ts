@@ -13,7 +13,7 @@ function createWindow(): void {
     ...(process.platform === "linux" ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.mjs"),
-      sandbox: false,
+      sandbox: false, // TODO: Enable sandbox for security — disabling gives renderer process full Node.js access
     },
   })
 
@@ -22,6 +22,7 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
+    // TODO: Add URL allowlist — currently opens ANY URL via shell, potential security risk
     shell.openExternal(details.url)
     return { action: "deny" }
   })

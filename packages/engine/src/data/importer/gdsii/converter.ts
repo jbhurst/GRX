@@ -34,6 +34,7 @@ export function convert(gdsii: TREE.GDSIIBNF): LayerHierarchy {
     }
   }
 
+  // TODO: O(n²) — Array.indexOf inside filter creates quadratic complexity. Use a Set for referencedCells instead.
   const topLevelCells = Array.from(plotter.availableCells).filter((obj) => Array.from(plotter.referencedCells).indexOf(obj) == -1)
 
   // convert GDSIIHierarchy to LayerHierarchy

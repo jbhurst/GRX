@@ -22,12 +22,13 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./step/layer/shape/text/cozette/CozetteVector.ttf": "./src/step/layer/shape/text/cozette/CozetteVector.ttf"
   },
   "dependencies": {
+    "@grx/parser-gdsii": "workspace:*",
     "@hpcreery/tracespace-parser": "^5.0.4",
     "@hpcreery/tracespace-plotter": "^5.0.3",
     "@hpcreery/tracespace-renderer": "^5.0.3",

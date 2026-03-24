@@ -1,3 +1,5 @@
+// NOTE: ?worker&inline is required here — these run inside the engine worker (nested worker),
+// so URL-based ?worker loading fails. Inlining avoids the URL resolution issue.
 import dxfPluginWorker from "./importer/dxf?worker&inline"
 import gerberPluginWorker from "./importer/gerber?worker&inline"
 import ncPluginWorker from "./importer/nc?worker&inline"

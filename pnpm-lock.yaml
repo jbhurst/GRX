@@ -217,6 +217,9 @@ importers:
 
   packages/engine:
     dependencies:
+      '@grx/parser-gdsii':
+        specifier: workspace:*
+        version: link:../parser-gdsii
       '@hpcreery/tracespace-parser':
         specifier: ^5.0.4
         version: 5.0.4

@@ -97,6 +97,8 @@ export class Renderer {
   private engineWorker: Worker
   public engine: Comlink.Remote<typeof Engine>
   public interface: Comlink.Remote<typeof DataInterface>
+  private resizeObserver: ResizeObserver
+  private destroyed = false
 
   constructor({ container, attributes }: RenderEngineFrontendConfig) {
     if (container == null) {
@@ -122,7 +124,8 @@ export class Renderer {
     this.interface = this.engine.interface
 
     this.sendFontData()
-    new ResizeObserver(() => this.resize()).observe(this.CONTAINER)
+    this.resizeObserver = new ResizeObserver(() => this.resize())
+    this.resizeObserver.observe(this.CONTAINER)
     this.engine.render()
     this.pollViews()
   }
@@ -200,7 +203,10 @@ export class Renderer {
   }
 
   public async pollViews(): Promise<void> {
-    this.resize()
+    if (this.destroyed) return
+    this.managedViews.forEach((node) => {
+      this.engine.interface.update_view_box_from_dom_rect(node.id, node.getBoundingClientRect())
+    })
     requestAnimationFrame(() => this.pollViews())
   }
 
@@ -210,12 +216,16 @@ export class Renderer {
     }
     const engine = this.engine
     const sendPointerEvent = async (mouse: MouseEvent, event_type: (typeof PointerEvents)[keyof typeof PointerEvents]): Promise<void> => {
-      const [x, y] = await getMouseWorldCoordinates(mouse)
-      this.pointer.dispatchEvent(
-        new CustomEvent<PointerCoordinates>(event_type, {
-          detail: { x, y },
-        }),
-      )
+      try {
+        const [x, y] = await getMouseWorldCoordinates(mouse)
+        this.pointer.dispatchEvent(
+          new CustomEvent<PointerCoordinates>(event_type, {
+            detail: { x, y },
+          }),
+        )
+      } catch (err) {
+        console.error("Pointer event dispatch error:", err)
+      }
     }
 
     /**
@@ -242,7 +252,7 @@ export class Renderer {
     const removePointerCache = (ev: globalThis.PointerEvent): void => {
       // Remove this event from the target's cache
       const index = this.pointerCache.findIndex((cachedEv) => cachedEv.pointerId === ev.pointerId)
-      this.pointerCache.splice(index, 1)
+      if (index !== -1) this.pointerCache.splice(index, 1)
     }
 
     await engine.interface.update_view_box_from_dom_rect(element.id, element.getBoundingClientRect())
@@ -270,153 +280,174 @@ export class Renderer {
     element.style.cursor = "grab"
 
     element.onwheel = async (e): Promise<void> => {
-      const { x: offsetX, y: offsetY, width, height } = element.getBoundingClientRect()
-      const settings = await engine.interface.read_engine_settings()
-      const moveScale = this.canvasSettings.dpr
+      try {
+        const { x: offsetX, y: offsetY, width, height } = element.getBoundingClientRect()
+        const settings = await engine.interface.read_engine_settings()
+        const moveScale = this.canvasSettings.dpr
 
-      if (settings.ZOOM_TO_CURSOR) {
-        // const [x, y] = await getMouseWorldCoordinates(element, e)
-        // engine.interface.zoom_at_point(element.id, x, y, e.deltaY * moveScale)
-        engine.interface.zoom_at_point(element.id, (e.x - offsetX) * moveScale, (e.y - offsetY) * moveScale, e.deltaY * moveScale)
-      } else {
-        engine.interface.zoom_at_point(element.id, width / 2, height / 2, e.deltaY * moveScale)
+        if (settings.ZOOM_TO_CURSOR) {
+          engine.interface.zoom_at_point(element.id, (e.x - offsetX) * moveScale, (e.y - offsetY) * moveScale, e.deltaY * moveScale)
+        } else {
+          engine.interface.zoom_at_point(element.id, width / 2, height / 2, e.deltaY * moveScale)
+        }
+      } catch (err) {
+        console.error("Wheel handler error:", err)
       }
     }
     element.onpointerdown = async (e): Promise<void> => {
-      if (e.button == 2) return // ignore
-      sendPointerEvent(e, PointerEvents.POINTER_DOWN)
-      const [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
-      this.pointerCache.push(e)
-      if (this.pointerSettings.mode === PointerMode.MOVE) {
-        element.style.cursor = "grabbing"
-        await engine.interface.view_pointer_grab(element.id)
-      } else if (this.pointerSettings.mode === PointerMode.SELECT) {
-        element.style.cursor = "wait"
-        const features = await engine.interface.read_view_select(element.id, [xcanvas, ycanvas])
-        // console.log("features", features)
-        this.pointer.dispatchEvent(
-          new CustomEvent<QuerySelection[]>(PointerEvents.POINTER_SELECT, {
-            detail: features,
-          }),
-        )
-        element.style.cursor = "crosshair"
-      } else if (this.pointerSettings.mode === PointerMode.MEASURE) {
-        element.style.cursor = "crosshair"
-        let [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
-        const currentMeasurement = await engine.interface.read_view_current_measurement(element.id)
-        if (currentMeasurement != null) {
-          if (e.shiftKey && measureStartCanvas) {
-            ;[xcanvas, ycanvas] = constrainAngle(measureStartCanvas, [xcanvas, ycanvas])
+      try {
+        if (e.button == 2) return // ignore
+        sendPointerEvent(e, PointerEvents.POINTER_DOWN)
+        const [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
+        this.pointerCache.push(e)
+        if (this.pointerSettings.mode === PointerMode.MOVE) {
+          element.style.cursor = "grabbing"
+          await engine.interface.view_pointer_grab(element.id)
+        } else if (this.pointerSettings.mode === PointerMode.SELECT) {
+          element.style.cursor = "wait"
+          const features = await engine.interface.read_view_select(element.id, [xcanvas, ycanvas])
+          this.pointer.dispatchEvent(
+            new CustomEvent<QuerySelection[]>(PointerEvents.POINTER_SELECT, {
+              detail: features,
+            }),
+          )
+          element.style.cursor = "crosshair"
+        } else if (this.pointerSettings.mode === PointerMode.MEASURE) {
+          element.style.cursor = "crosshair"
+          let [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
+          const currentMeasurement = await engine.interface.read_view_current_measurement(element.id)
+          if (currentMeasurement != null) {
+            if (e.shiftKey && measureStartCanvas) {
+              ;[xcanvas, ycanvas] = constrainAngle(measureStartCanvas, [xcanvas, ycanvas])
+            }
+            engine.interface.finish_view_measurement(element.id, [xcanvas, ycanvas])
+            measureStartCanvas = null
+          } else {
+            measureStartCanvas = [xcanvas, ycanvas]
+            engine.interface.create_view_measurement(element.id, [xcanvas, ycanvas])
           }
-          engine.interface.finish_view_measurement(element.id, [xcanvas, ycanvas])
-          measureStartCanvas = null
-        } else {
-          measureStartCanvas = [xcanvas, ycanvas]
-          engine.interface.create_view_measurement(element.id, [xcanvas, ycanvas])
         }
+      } catch (err) {
+        console.error("Pointer down handler error:", err)
       }
     }
     element.onpointerup = async (e): Promise<void> => {
-      sendPointerEvent(e, PointerEvents.POINTER_UP)
-      if (this.pointerSettings.mode === PointerMode.MOVE) {
-        element.style.cursor = "grab"
-        await engine.interface.view_pointer_release(element.id)
+      try {
+        sendPointerEvent(e, PointerEvents.POINTER_UP)
+        if (this.pointerSettings.mode === PointerMode.MOVE) {
+          element.style.cursor = "grab"
+          await engine.interface.view_pointer_release(element.id)
+        }
+        removePointerCache(e)
+      } catch (err) {
+        console.error("Pointer up handler error:", err)
       }
-      removePointerCache(e)
     }
     element.onpointercancel = async (e): Promise<void> => {
-      sendPointerEvent(e, PointerEvents.POINTER_UP)
-      if (this.pointerSettings.mode === PointerMode.MOVE) {
-        await engine.interface.view_pointer_release(element.id)
+      try {
+        sendPointerEvent(e, PointerEvents.POINTER_UP)
+        if (this.pointerSettings.mode === PointerMode.MOVE) {
+          await engine.interface.view_pointer_release(element.id)
+        }
+        removePointerCache(e)
+      } catch (err) {
+        console.error("Pointer cancel handler error:", err)
       }
-      removePointerCache(e)
     }
     element.onpointerleave = async (e): Promise<void> => {
-      sendPointerEvent(e, PointerEvents.POINTER_UP)
-      if (this.pointerSettings.mode === PointerMode.MOVE) {
-        await engine.interface.view_pointer_release(element.id)
+      try {
+        sendPointerEvent(e, PointerEvents.POINTER_UP)
+        if (this.pointerSettings.mode === PointerMode.MOVE) {
+          await engine.interface.view_pointer_release(element.id)
+        }
+        removePointerCache(e)
+      } catch (err) {
+        console.error("Pointer leave handler error:", err)
       }
-      removePointerCache(e)
     }
     element.onpointerenter = async (e): Promise<void> => {
-      sendPointerEvent(e, PointerEvents.POINTER_HOVER)
+      try {
+        sendPointerEvent(e, PointerEvents.POINTER_HOVER)
+      } catch (err) {
+        console.error("Pointer enter handler error:", err)
+      }
     }
     element.onpointermove = async (e): Promise<void> => {
-      sendPointerEvent(e, PointerEvents.POINTER_MOVE)
-      const index = this.pointerCache.findIndex((cachedEv) => cachedEv.pointerId === e.pointerId)
-      this.pointerCache[index] = e
-      const moveScale = this.canvasSettings.dpr
+      try {
+        sendPointerEvent(e, PointerEvents.POINTER_MOVE)
+        const index = this.pointerCache.findIndex((cachedEv) => cachedEv.pointerId === e.pointerId)
+        if (index !== -1) this.pointerCache[index] = e
+        const moveScale = this.canvasSettings.dpr
 
-      if (this.pointerSettings.mode === PointerMode.MEASURE) {
-        element.style.cursor = "crosshair"
-        let [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
-        if (e.shiftKey && measureStartCanvas) {
-          ;[xcanvas, ycanvas] = constrainAngle(measureStartCanvas, [xcanvas, ycanvas])
-        }
-        engine.interface.update_view_measurement(element.id, [xcanvas, ycanvas])
-      }
-
-      if (!(await engine.interface.read_pointer_grab(element.id))) {
-        await sendPointerEvent(e, PointerEvents.POINTER_HOVER)
-        return
-      }
-
-      if (this.pointerSettings.mode === PointerMode.MOVE) {
-        // If more than 2 pointers are down, check for pinch gestures
-        if (this.pointerCache.length >= 2) {
-          const p1 = this.pointerCache[0]
-          const p2 = this.pointerCache[1]
-          const startDistance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY)
-          const endDistance = Math.hypot(
-            p1.clientX + p1.movementX - (p2.clientX + p2.movementX),
-            p1.clientY + p1.movementY - (p2.clientY + p2.movementY),
-          )
-          const zoomFactor = ((startDistance - endDistance) / this.pointerCache.length) * moveScale
-          const settings = await engine.interface.read_engine_settings()
-          const { x: offsetX, y: offsetY, width, height } = element.getBoundingClientRect()
-          if (settings.ZOOM_TO_CURSOR) {
-            engine.interface.zoom_at_point(element.id, (e.x - offsetX) * moveScale, (e.y - offsetY) * moveScale, zoomFactor * moveScale)
-          } else {
-            engine.interface.zoom_at_point(element.id, width / 2, height / 2, zoomFactor)
+        if (this.pointerSettings.mode === PointerMode.MEASURE) {
+          element.style.cursor = "crosshair"
+          let [xcanvas, ycanvas] = getMouseCanvasCoordinates(e)
+          if (e.shiftKey && measureStartCanvas) {
+            ;[xcanvas, ycanvas] = constrainAngle(measureStartCanvas, [xcanvas, ycanvas])
           }
-          engine.interface.view_move(element.id, e.movementX / this.pointerCache.length, e.movementY / this.pointerCache.length)
-        } else {
-          if (e.buttons == 4) {
-            await engine.interface.view_rotate(element.id, e.movementY * moveScale, e.movementX * moveScale)
+          engine.interface.update_view_measurement(element.id, [xcanvas, ycanvas])
+        }
+
+        if (!(await engine.interface.read_pointer_grab(element.id))) {
+          await sendPointerEvent(e, PointerEvents.POINTER_HOVER)
+          return
+        }
+
+        if (this.pointerSettings.mode === PointerMode.MOVE) {
+          // If more than 2 pointers are down, check for pinch gestures
+          if (this.pointerCache.length >= 2) {
+            const p1 = this.pointerCache[0]
+            const p2 = this.pointerCache[1]
+            const startDistance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY)
+            const endDistance = Math.hypot(
+              p1.clientX + p1.movementX - (p2.clientX + p2.movementX),
+              p1.clientY + p1.movementY - (p2.clientY + p2.movementY),
+            )
+            const zoomFactor = ((startDistance - endDistance) / this.pointerCache.length) * moveScale
+            const settings = await engine.interface.read_engine_settings()
+            const { x: offsetX, y: offsetY, width, height } = element.getBoundingClientRect()
+            if (settings.ZOOM_TO_CURSOR) {
+              engine.interface.zoom_at_point(element.id, (e.x - offsetX) * moveScale, (e.y - offsetY) * moveScale, zoomFactor * moveScale)
+            } else {
+              engine.interface.zoom_at_point(element.id, width / 2, height / 2, zoomFactor)
+            }
+            engine.interface.view_move(element.id, e.movementX / this.pointerCache.length, e.movementY / this.pointerCache.length)
           } else {
-            await engine.interface.view_move(element.id, e.movementX * moveScale, e.movementY * moveScale)
+            if (e.buttons == 4) {
+              await engine.interface.view_rotate(element.id, e.movementY * moveScale, e.movementX * moveScale)
+            } else {
+              await engine.interface.view_move(element.id, e.movementX * moveScale, e.movementY * moveScale)
+            }
           }
         }
+      } catch (err) {
+        console.error("Pointer move handler error:", err)
       }
     }
     element.onkeydown = async (e): Promise<void> => {
-      // if (e.key === 'Escape') {
-      //   await engine.cancelMeasurement()
-      //   this.pointerSettings.mode = 'move'
-      //   element.style.cursor = 'grab'
-      // }
-      console.log(e.key)
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
-        const isDragging = await engine.interface.read_pointer_grab(element.id)
-        if (isDragging) return
-        // this.engine.then((engine) => {
-        // })
-        engine.interface.view_pointer_grab(element.id)
-        switch (e.key) {
-          case "ArrowUp":
-            engine.interface.view_move(element.id, 0, 10)
-            break
-          case "ArrowDown":
-            engine.interface.view_move(element.id, 0, -10)
-            break
-          case "ArrowLeft":
-            engine.interface.view_move(element.id, 10, 0)
-            break
-          case "ArrowRight":
-            engine.interface.view_move(element.id, -10, 0)
-            break
+      try {
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+          const isDragging = await engine.interface.read_pointer_grab(element.id)
+          if (isDragging) return
+          engine.interface.view_pointer_grab(element.id)
+          switch (e.key) {
+            case "ArrowUp":
+              engine.interface.view_move(element.id, 0, 10)
+              break
+            case "ArrowDown":
+              engine.interface.view_move(element.id, 0, -10)
+              break
+            case "ArrowLeft":
+              engine.interface.view_move(element.id, 10, 0)
+              break
+            case "ArrowRight":
+              engine.interface.view_move(element.id, -10, 0)
+              break
+          }
+          engine.interface.view_pointer_release(element.id)
         }
-        engine.interface.view_pointer_release(element.id)
+      } catch (err) {
+        console.error("Keydown handler error:", err)
       }
     }
   }
@@ -472,6 +503,8 @@ export class Renderer {
   // }
 
   public async destroy(): Promise<void> {
+    this.destroyed = true
+    this.resizeObserver.disconnect()
     this.engine.destroy()
     this.engine[Comlink.releaseProxy]()
     this.engineWorker.terminate()

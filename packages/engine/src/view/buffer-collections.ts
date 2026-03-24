@@ -319,7 +319,7 @@ export class ShapesShaderCollection extends UpdateEventTarget {
 }
 
 export const initStaticShaderCollections = (regl: REGL.Regl): void => {
-  console.log("Initializing static shader collections")
+  // console.log("Initializing static shader collections")
 
   // setup symbol shader collection
   SymbolShaderCollection.regl = regl

@@ -42,6 +42,7 @@ export default function LayerTransform(props: LayerTransformProps): JSX.Element 
 
   const { units, renderer } = useContext(EditorConfigProvider)
   const [layerName, setLayerName] = useState<string>("")
+  const [initialized, setInitialized] = useState<boolean>(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -79,6 +80,7 @@ export default function LayerTransform(props: LayerTransformProps): JSX.Element 
     } else {
       setTransformOrder(["translate", "rotate", "mirror", "scale"])
     }
+    setInitialized(true)
   }
 
   async function setLayerTransform(): Promise<void> {
@@ -98,8 +100,9 @@ export default function LayerTransform(props: LayerTransformProps): JSX.Element 
   }, [])
 
   useEffect(() => {
+    if (!initialized) return
     setLayerTransform()
-  })
+  }, [datumX, datumY, rotation, scale, mirror_x, mirror_y, transformOrder])
 
   const roundToThree = (num: number): number => {
     return Number(`${Math.round(Number(`${num}e+5`))}e-5`)

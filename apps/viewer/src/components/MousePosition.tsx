@@ -23,7 +23,7 @@ export default function MousePosition(_props: MousePositionProps): JSX.Element |
       renderer.pointer.removeEventListener(PointerEvents.POINTER_HOVER, handleMouseMove as EventListener)
       renderer.pointer.removeEventListener(PointerEvents.POINTER_DOWN, handleMouseMove as EventListener)
     }
-  }, [])
+  }, [renderer])
 
   return (
     <Tooltip label={`Units: ${units}`} position="left" withArrow>

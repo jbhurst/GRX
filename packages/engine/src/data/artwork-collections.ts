@@ -1566,7 +1566,7 @@ export class MacroArtworkBufferCollection extends ArtworkBufferCollection {
 }
 
 export const test = (): void => {
-  console.log("Test function in artwork-collection.ts")
+  // console.log("Test function in artwork-collection.ts")
 }
 
 /**

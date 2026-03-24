@@ -16,23 +16,30 @@ export default function EngineStats(_props: EngineStatsProps): JSX.Element {
   const [framebufferCount, setFramebufferCount] = useState<number>(0)
   const [elementsCount, setElementsCount] = useState<number>(0)
 
-  const update = async (): Promise<void> => {
-    const stats = await renderer.engine.getStats()
-    setRenderTime(Math.round(stats.engine.renderTimeMilliseconds))
-    setFPS(Math.round(1000 / stats.engine.renderTimeMilliseconds))
-    setTextureSize(Math.round(stats.regl.totalTextureSize / 1024 / 1024))
-    setBufferSize(Math.round(stats.regl.totalBufferSize / 1024 / 1024))
-    setRenderBufferSize(Math.round(stats.regl.totalRenderbufferSize / 1024 / 1024))
-    setBufferCount(stats.regl.bufferCount)
-    setTextureCount(stats.regl.textureCount)
-    setShaderCount(stats.regl.shaderCount)
-    setFramebufferCount(stats.regl.framebufferCount)
-    setElementsCount(stats.regl.elementsCount)
-    requestAnimationFrame(update)
-  }
-
   useEffect(() => {
-    requestAnimationFrame(update)
+    let frameId: number
+    let cancelled = false
+    const update = async (): Promise<void> => {
+      if (cancelled) return
+      const stats = await renderer.engine.getStats()
+      if (cancelled) return
+      setRenderTime(Math.round(stats.engine.renderTimeMilliseconds))
+      setFPS(Math.round(1000 / stats.engine.renderTimeMilliseconds))
+      setTextureSize(Math.round(stats.regl.totalTextureSize / 1024 / 1024))
+      setBufferSize(Math.round(stats.regl.totalBufferSize / 1024 / 1024))
+      setRenderBufferSize(Math.round(stats.regl.totalRenderbufferSize / 1024 / 1024))
+      setBufferCount(stats.regl.bufferCount)
+      setTextureCount(stats.regl.textureCount)
+      setShaderCount(stats.regl.shaderCount)
+      setFramebufferCount(stats.regl.framebufferCount)
+      setElementsCount(stats.regl.elementsCount)
+      frameId = requestAnimationFrame(update)
+    }
+    frameId = requestAnimationFrame(update)
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frameId)
+    }
   }, [])
 
   const tableData: TableData = {

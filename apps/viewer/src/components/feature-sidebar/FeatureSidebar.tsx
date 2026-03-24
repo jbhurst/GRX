@@ -78,7 +78,7 @@ export function FeatureSidebar(_props: ToolbarProps): JSX.Element {
     return (): void => {
       renderer.pointer.removeEventListener(PointerEvents.POINTER_SELECT, handler)
     }
-  }, [])
+  }, [renderer])
 
   return (
     <Transition mounted={mounted} transition="slide-left" duration={400} exitDuration={400} timingFunction="ease">

@@ -50,17 +50,21 @@ export default function LayerSidebar(_props: SidebarProps): JSX.Element | null {
   }
 
   async function confirmFiles(files: UploadFile[]): Promise<void> {
-    files.forEach((file) => openFile(file))
+    for (const file of files) {
+      await openFile(file)
+    }
+    setLayers(await renderer.interface.read_layers_list(project.name))
+    await renderer.engine.interface.update_view_zoom_fit_artwork(project.name)
     setFiles([])
   }
 
   async function deleteAllLayers(): Promise<void> {
-    layers.forEach(async (layer) => {
+    for (const layer of layers) {
       if (!renderer.engine) return
       await renderer.interface.delete_layer(project.name, layer)
-      setLayers(await renderer.interface.read_layers_list(project.name))
-      setRenderID(0)
-    })
+    }
+    setLayers(await renderer.interface.read_layers_list(project.name))
+    setRenderID(0)
   }
 
   useEffect(() => {
@@ -87,17 +91,17 @@ export default function LayerSidebar(_props: SidebarProps): JSX.Element | null {
       setLayers(await renderer.interface.read_layers_list(project.name))
       return
     },
-    hideAll: (): void => {
-      layers.forEach(async (layer) => {
+    hideAll: async (): Promise<void> => {
+      for (const layer of layers) {
         await renderer.engine.interface.update_view_layer_visibility(project.name, layer, false)
-        setRenderID(renderID + 1)
-      })
+      }
+      setRenderID(renderID + 1)
     },
-    showAll: (): void => {
-      layers.forEach(async (layer) => {
+    showAll: async (): Promise<void> => {
+      for (const layer of layers) {
         await renderer.engine.interface.update_view_layer_visibility(project.name, layer, true)
-        setRenderID(renderID + 1)
-      })
+      }
+      setRenderID(renderID + 1)
     },
     deleteAll: openDeleteConfirmModal,
     rename: async (oldName: string, newName: string): Promise<void> => {
@@ -152,93 +156,81 @@ export default function LayerSidebar(_props: SidebarProps): JSX.Element | null {
     }
   }
 
-  function openFile(file: UploadFile): void {
-    const reader = new FileReader()
-    reader.onerror = (err): void => {
-      console.error(err, `${file.name} Error reading file.`)
-      notifications.show({
-        title: "Error reading file",
-        message: `${file.name} Error reading file.`,
-        color: "red",
-        autoClose: 5000,
-      })
-    }
-    reader.onabort = (err): void => {
-      console.warn(err, `${file.name} File read aborted.`)
-      notifications.show({
-        title: "File read aborted",
-        message: `${file.name} File read aborted.`,
-        color: "red",
-        autoClose: 5000,
-      })
-    }
-    reader.onprogress = (e): void => {
-      const percent = Math.round((e.loaded / e.total) * 100)
-      console.info(`${file.name} ${percent}% read`)
-    }
-    reader.onload = async (_e): Promise<void> => {
-      if (reader.result !== null && reader.result !== undefined) {
-        const loadingNotificationID = notifications.show({
-          title: "Importing file",
-          message: `${file.name} file is being imported...`,
-          color: "yellow",
-          autoClose: false,
-          loading: true,
-        })
-        try {
-          // console.time(`${file.name} file parse time`)
-          // await DataInterface.create_layer(project.name, file.id)
-          await renderer.interface._import_file(Comlink.transfer(reader.result as ArrayBuffer, [reader.result as ArrayBuffer]), file.format, {
-            project: project.name,
-            step: project.name,
-            layer: file.id,
-          })
-          setLayers(await renderer.interface.read_layers_list(project.name))
-          // console.timeEnd(`${file.name} file parse time`)
-          notifications.update({
-            id: loadingNotificationID,
-            title: "File imported successfully",
-            message: `${file.name} file imported.`,
-            color: "green",
-            autoClose: 5000,
-            loading: false,
-          })
-          // notifications.show({
-          //   title: "File imported successfully",
-          //   message: `${file.name} file imported.`,
-          //   color: "green",
-          //   autoClose: 5000,
-          // })
-        } catch (fileImportError) {
-          if (fileImportError instanceof Error) {
-            console.error(fileImportError)
-            // notifications.show({
-            //   title: "Failed to import file",
-            //   message: `${file.name} file import error. ${fileImportError.message}`,
-            //   color: "red",
-            //   autoClose: 5000,
-            // })
-            notifications.update({
-              id: loadingNotificationID,
-              title: "Failed to import file",
-              message: `${file.name} file import error. ${fileImportError.message}`,
-              color: "red",
-              autoClose: 5000,
-              loading: false,
-            })
-          }
-        }
-      } else {
+  function openFile(file: UploadFile): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onerror = (err): void => {
+        console.error(err, `${file.name} Error reading file.`)
         notifications.show({
-          title: "File upload failed",
-          message: `${file.name} file upload failed.`,
+          title: "Error reading file",
+          message: `${file.name} Error reading file.`,
           color: "red",
           autoClose: 5000,
         })
+        reject(err)
       }
-    }
-    reader.readAsArrayBuffer(file)
-    // })
+      reader.onabort = (err): void => {
+        console.warn(err, `${file.name} File read aborted.`)
+        notifications.show({
+          title: "File read aborted",
+          message: `${file.name} File read aborted.`,
+          color: "red",
+          autoClose: 5000,
+        })
+        resolve()
+      }
+      reader.onprogress = (e): void => {
+        const percent = Math.round((e.loaded / e.total) * 100)
+        console.info(`${file.name} ${percent}% read`)
+      }
+      reader.onload = async (_e): Promise<void> => {
+        if (reader.result !== null && reader.result !== undefined) {
+          const loadingNotificationID = notifications.show({
+            title: "Importing file",
+            message: `${file.name} file is being imported...`,
+            color: "yellow",
+            autoClose: false,
+            loading: true,
+          })
+          try {
+            await renderer.interface._import_file(Comlink.transfer(reader.result as ArrayBuffer, [reader.result as ArrayBuffer]), file.format, {
+              project: project.name,
+              step: project.name,
+              layer: file.id,
+            })
+            notifications.update({
+              id: loadingNotificationID,
+              title: "File imported successfully",
+              message: `${file.name} file imported.`,
+              color: "green",
+              autoClose: 5000,
+              loading: false,
+            })
+          } catch (fileImportError) {
+            if (fileImportError instanceof Error) {
+              console.error(fileImportError)
+              notifications.update({
+                id: loadingNotificationID,
+                title: "Failed to import file",
+                message: `${file.name} file import error. ${fileImportError.message}`,
+                color: "red",
+                autoClose: 5000,
+                loading: false,
+              })
+            }
+          }
+        } else {
+          notifications.show({
+            title: "File upload failed",
+            message: `${file.name} file upload failed.`,
+            color: "red",
+            autoClose: 5000,
+          })
+        }
+        resolve()
+      }
+      reader.readAsArrayBuffer(file)
+    })
   }
 
   return (
@@ -391,7 +383,7 @@ export default function LayerSidebar(_props: SidebarProps): JSX.Element | null {
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis]}>
                 <SortableContext items={layers} strategy={verticalListSortingStrategy}>
                   {layers.map((layer) => (
-                    <LayerListItem key={layer} layer={layer} actions={actions} />
+                    <LayerListItem key={layer} layer={layer} actions={actions} renderID={renderID} />
                   ))}
                 </SortableContext>
               </DndContext>

@@ -39,13 +39,14 @@ interface LayerActions {
 interface LayerListItemProps {
   layer: string
   actions: LayerActions
+  renderID?: number
 }
 
 export default function LayerListItem(props: LayerListItemProps): JSX.Element | null {
   const { renderer } = useContext(EditorConfigProvider)
   const { showContextMenu } = useContextMenu()
   // const { file, actions } = props
-  const { actions, layer } = props
+  const { actions, layer, renderID } = props
   const [{ width }, api] = useSpring(() => ({ x: 0, y: 0, width: 0 }))
   const [color, setColor] = useState<vec3>(vec3.fromValues(0.5, 0.5, 0.5))
   const [colorPickerVisible, setColorPickerVisible] = useState<boolean>(false)
@@ -101,6 +102,7 @@ export default function LayerListItem(props: LayerListItemProps): JSX.Element | 
         setColorPickerVisible={setColorPickerVisible}
         colorPickerVisible={colorPickerVisible}
         width={width}
+        renderID={renderID}
       />
       <Popover.Dropdown
         style={{
@@ -151,6 +153,7 @@ interface DraggableLayerProps {
   width: SpringValue<number>
   setLayerTransformVisible: (visible: boolean) => void
   actions: LayerActions
+  renderID?: number
 }
 
 function DraggableLayer(props: DraggableLayerProps): JSX.Element {
@@ -165,6 +168,7 @@ function DraggableLayer(props: DraggableLayerProps): JSX.Element {
     width,
     setLayerTransformVisible,
     actions,
+    renderID,
   } = props
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: props.layer })
   const theme = useMantineTheme()
@@ -281,9 +285,7 @@ function DraggableLayer(props: DraggableLayerProps): JSX.Element {
   useEffect(() => {
     getLayerColor()
     getLayerVisibility()
-
-    return (): void => {}
-  })
+  }, [layer, renderID])
 
   const rename = (): void => {
     if (editing === "") {
