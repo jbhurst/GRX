@@ -1,10 +1,10 @@
 import React, { type JSX, useMemo } from "react"
 import "./demo.css"
 import { Box, Button, SegmentedControl, Switch } from "@mantine/core"
-import { type PointerEvent, PointerEvents, Renderer } from "../src"
-import * as Shapes from "../src/data/shape/shape"
-import * as Symbols from "../src/data/shape/symbol/symbol"
-import { POINTER_MODES, type POINTER_MODES_MAP, SNAP_MODES, type SNAP_MODES_MAP } from "../src/types"
+import { type PointerEvent, PointerEvents, Renderer } from ".."
+import * as Shapes from "../data/shape/shape"
+import * as Symbols from "../data/shape/symbol/symbol"
+import { POINTER_MODES, type POINTER_MODES_MAP, SNAP_MODES, type SNAP_MODES_MAP } from "../types"
 
 // import * as BufferCollection from './engine/buffer-collection'
 
@@ -15,7 +15,7 @@ import { POINTER_MODES, type POINTER_MODES_MAP, SNAP_MODES, type SNAP_MODES_MAP 
 // import drd from "@lib/gerber/testdata/boards/bus-pirate/BusPirate-v3.6a-SSOP.drd?arraybuffer"
 // import gko from "@lib/gerber/testdata/boards/bus-pirate/BusPirate-v3.6a-SSOP.gko?arraybuffer"
 // import plc from "@lib/gerber/testdata/boards/bus-pirate/BusPirate-v3.6a-SSOP.plc?arraybuffer"
-// import pls from "@lib/gerber/testdata/boards/bus-pirate/BusPirate-v3.6a-SSOP.pls?arraybuffer"
+// import pls from "@lib/gerber/testdata/boa rds/bus-pirate/BusPirate-v3.6a-SSOP.pls?arraybuffer"
 // import sol from "@lib/gerber/testdata/boards/bus-pirate/BusPirate-v3.6a-SSOP.sol?arraybuffer"
 // import stc from "@lib/gerber/testdata/boards/bus-pirate/BusPirate-v3.6a-SSOP.stc?arraybuffer"
 // import sts from "@lib/gerber/testdata/boards/bus-pirate/BusPirate-v3.6a-SSOP.sts?arraybuffer"
@@ -24,7 +24,11 @@ import { POINTER_MODES, type POINTER_MODES_MAP, SNAP_MODES, type SNAP_MODES_MAP 
 // import multi_polarity_over_existing from '@lib/gerber/testdata/gerbers/step-repeats/multi-polarity-over-existing.gbr?raw'
 // import multi_polarity_over_self from '@lib/gerber/testdata/gerbers/step-repeats/multi-polarity-over-self.gbr?raw'
 // import gtl_in from "@lib/gerber/testdata/boards/clockblock/clockblock-B_Cu.gbr?arraybuffer"
-// import gtl_mm from "@lib/gerber/testdata/boards/mini_linux_board_mm/Gerber_TopLayer.GTL?arraybuffer"
+// import gtl_mm from "@lib/gerber/testdata/boards/mini_linux_board_mm/Gerber_TopLayer.GTL?arraybuffer"a
+
+import gtl from "../data/importer/gerber/testdata/boards/Arduino_UNO/Gerber_TopLayer.GTL?arraybuffer"
+import gto from "../data/importer/gerber/testdata/boards/Arduino_UNO/Gerber_TopSilkLayer.GTO?arraybuffer"
+import cmp from "../data/importer/gerber/testdata/boards/arduino-uno/arduino-uno.cmp?arraybuffer"
 
 const N_PADS = 0
 const N_LINES = 0
@@ -1212,6 +1216,7 @@ function DemoApp(): JSX.Element {
     })
 
     const settings = render.engine.interface.read_engine_settings()
+    render.canvasSettings.hidpi = true
     settings.then((setting) => {
       setOutlineMode(setting.OUTLINE_MODE)
       setSkeletonMode(setting.SKELETON_MODE)
@@ -1230,17 +1235,17 @@ function DemoApp(): JSX.Element {
     // DataInterface.create_layer(project, layer_cmp)
     // DataInterface.create_layer(project, layer_sol)
 
-    // DataInterface._import_file(cmp, "RS-274X", {
-    //   layer: "cmp",
-    //   step: step1,
-    //   project,
-    // })
+    DataInterface._import_file(cmp, "RS-274X", {
+      layer: "cmp",
+      step: step1,
+      project,
+    })
 
-    // DataInterface._import_file(sol, "RS-274X", {
-    //   layer: "sol",
-    //   step: step1,
-    //   project,
-    // })
+    DataInterface._import_file(gtl, "RS-274X", {
+      layer: "gtl",
+      step: step1,
+      project,
+    })
 
     // DataInterface._import_file(nested_aperture_macro, "RS-274X", {
     //   layer: "nested-aperture-macro",
@@ -1678,7 +1683,7 @@ function DemoApp(): JSX.Element {
         style={{
           // background: "white",
           // pointerEvents: "none",
-          // zIndex: 100,
+          zIndex: 0,
           width: "100%",
           height: "100%",
           position: "absolute",
@@ -1758,105 +1763,116 @@ function DemoApp(): JSX.Element {
         />
       </div>
       {renderer ? (
-        <Box
-          style={{
-            width: "100px",
-          }}
-        >
-          {/* <StatsWidget /> */}
+        <>
           <REGLStatsWidget renderer={renderer} />
           <MouseCoordinates engine={renderer} key="coordinates" />
-          <Button
-            onClick={async (): Promise<void> => {
-              const layers = await renderer.interface.read_layers_list(project)
-              setLayers(layers)
-              layers.map((l) => renderer.engine.interface.update_view_layer_color("box1", l, [Math.random(), Math.random(), Math.random()]))
+          <Box
+            style={{
+              width: "200px",
+              height: "100%",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              zIndex: 100,
+              pointerEvents: "all",
             }}
           >
-            Randomize Colors
-          </Button>
-          <Button
-            onClick={async (): Promise<void> => {
-              renderer.engine.interface.update_view_zoom_fit_artwork("box1")
-            }}
-          >
-            Zoom Fit
-          </Button>
-          <Button onClick={async (): Promise<void> => renderer.engine.interface.update_view_transform("box1", { position: [0, 0], zoom: 16 })}>
-            (0,0)
-          </Button>
-          <br />
-          Outline Mode
-          <Switch
-            checked={outlineMode}
-            onChange={async (e): Promise<void> => {
-              renderer.engine.interface.set_engine_settings({ OUTLINE_MODE: e.target.checked })
-              setOutlineMode(e.target.checked)
-              const layers = await renderer.interface.read_layers_list(project)
-              setLayers(layers)
-            }}
-          />
-          Skeleton Mode
-          <Switch
-            checked={skeletonMode}
-            onChange={async (e): Promise<void> => {
-              renderer.engine.interface.set_engine_settings({ SKELETON_MODE: e.target.checked })
-              setSkeletonMode(e.target.checked)
-              const layers = await renderer.interface.read_layers_list(project)
-              setLayers(layers)
-            }}
-          />
-          Zoom To Cursor
-          <Switch
-            checked={zoomToCursor}
-            onChange={(e): void => {
-              renderer.engine.interface.set_engine_settings({ ZOOM_TO_CURSOR: e.target.checked })
-              setZoomToCursor(e.target.checked)
-            }}
-          />
-          3D View
-          <Switch
-            checked={enable3d}
-            onChange={(e): void => {
-              renderer.engine.interface.set_engine_settings({ ENABLE_3D: e.target.checked })
-              setEnable3d(e.target.checked)
-            }}
-          />
-          3D Perspective
-          <Switch
-            checked={perspective3D}
-            onChange={(e): void => {
-              renderer.engine.interface.set_engine_settings({ PERSPECTIVE_3D: e.target.checked })
-              setPerspective3D(e.target.checked)
-            }}
-          />
-          Mouse Mode
-          <SegmentedControl data={[...POINTER_MODES]} onChange={(mode) => (renderer.pointerSettings.mode = mode as keyof typeof POINTER_MODES_MAP)} />
-          Snap Mode
-          <SegmentedControl
-            data={[...SNAP_MODES]}
-            onChange={(mode) => {
-              renderer.engine.interface.set_engine_settings({ SNAP_MODE: mode as keyof typeof SNAP_MODES_MAP })
-            }}
-          />
-          {layers.map((layer, i) => {
-            return (
-              <div key={i}>
-                {layer}
-                <Switch
-                  // defaultChecked={layer.visible}
-                  onChange={async (e): Promise<void> => {
-                    renderer.interface.read_steps_list(project).then((allSteps) => {
-                      allSteps.map((step) => {
-                        renderer.engine.interface.update_view_layer_visibility(step, layer, e.target.checked)
+            {/* <StatsWidget /> */}
+            <Button
+              onClick={async (): Promise<void> => {
+                const layers = await renderer.interface.read_layers_list(project)
+                setLayers(layers)
+                layers.map((l) => renderer.engine.interface.update_view_layer_color("box1", l, [Math.random(), Math.random(), Math.random()]))
+              }}
+            >
+              Randomize Colors
+            </Button>
+            <Button
+              onClick={async (): Promise<void> => {
+                renderer.engine.interface.update_view_zoom_fit_artwork("box1")
+              }}
+            >
+              Zoom Fit
+            </Button>
+            <Button onClick={async (): Promise<void> => renderer.engine.interface.update_view_transform("box1", { position: [0, 0], zoom: 16 })}>
+              (0,0)
+            </Button>
+            <br />
+            Outline Mode
+            <Switch
+              checked={outlineMode}
+              onChange={async (e): Promise<void> => {
+                renderer.engine.interface.set_engine_settings({ OUTLINE_MODE: e.target.checked })
+                setOutlineMode(e.target.checked)
+                const layers = await renderer.interface.read_layers_list(project)
+                setLayers(layers)
+              }}
+            />
+            Skeleton Mode
+            <Switch
+              checked={skeletonMode}
+              onChange={async (e): Promise<void> => {
+                renderer.engine.interface.set_engine_settings({ SKELETON_MODE: e.target.checked })
+                setSkeletonMode(e.target.checked)
+                const layers = await renderer.interface.read_layers_list(project)
+                setLayers(layers)
+              }}
+            />
+            Zoom To Cursor
+            <Switch
+              checked={zoomToCursor}
+              onChange={(e): void => {
+                renderer.engine.interface.set_engine_settings({ ZOOM_TO_CURSOR: e.target.checked })
+                setZoomToCursor(e.target.checked)
+              }}
+            />
+            3D View
+            <Switch
+              checked={enable3d}
+              onChange={(e): void => {
+                renderer.engine.interface.set_engine_settings({ ENABLE_3D: e.target.checked })
+                setEnable3d(e.target.checked)
+              }}
+            />
+            3D Perspective
+            <Switch
+              checked={perspective3D}
+              onChange={(e): void => {
+                renderer.engine.interface.set_engine_settings({ PERSPECTIVE_3D: e.target.checked })
+                setPerspective3D(e.target.checked)
+              }}
+            />
+            Mouse Mode
+            <SegmentedControl
+              data={[...POINTER_MODES]}
+              onChange={(mode) => (renderer.pointerSettings.mode = mode as keyof typeof POINTER_MODES_MAP)}
+            />
+            Snap Mode
+            <SegmentedControl
+              data={[...SNAP_MODES]}
+              onChange={(mode) => {
+                renderer.engine.interface.set_engine_settings({ SNAP_MODE: mode as keyof typeof SNAP_MODES_MAP })
+              }}
+            />
+            {layers.map((layer, i) => {
+              return (
+                <div key={i}>
+                  {layer}
+                  <Switch
+                    // defaultChecked={layer.visible}
+                    onChange={async (e): Promise<void> => {
+                      renderer.interface.read_steps_list(project).then((allSteps) => {
+                        allSteps.map((step) => {
+                          renderer.engine.interface.update_view_layer_visibility(step, layer, e.target.checked)
+                        })
                       })
-                    })
-                  }}
-                />
-              </div>
-            )
-          })}
-        </Box>
+                    }}
+                  />
+                </div>
+              )
+            })}
+          </Box>
+        </>
       ) : null}
     </>
   )

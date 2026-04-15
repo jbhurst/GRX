@@ -1,5 +1,4 @@
 import { ColorPicker, Divider, Flex, Group, Radio, Switch, Text, useMantineColorScheme, useMantineTheme } from "@mantine/core"
-import { useLocalStorage } from "@mantine/hooks"
 import { EditorConfigProvider } from "@src/contexts/EditorContext"
 import { ThemeConfigProvider } from "@src/contexts/ThemeContext"
 import chroma from "chroma-js"
@@ -12,17 +11,14 @@ export default function GeneralSettingsModal(_props: SettingsModalProps): JSX.El
   const { transparency, setTransparency, setPrimaryColor } = React.useContext(ThemeConfigProvider)
   const theme = useMantineTheme()
   const colors = useMantineColorScheme()
-  const [useHiDPI, setUseHiDPI] = useLocalStorage<boolean>({
-    key: "engine:USE_HIDPI",
-    defaultValue: renderer.canvasSettings.hidpi,
-  })
+  // const [useHiDPI, setUseHiDPI] = useLocalStorage<boolean>({
+  //   key: "engine:USE_HIDPI",
+  //   defaultValue: renderer.canvasSettings.hidpi,
+  // })
 
   React.useEffect(() => {
     renderer.engine.interface.update_measurement_settings({ units })
   }, [units])
-  React.useEffect(() => {
-    renderer.canvasSettings.hidpi = useHiDPI
-  }, [useHiDPI])
 
   return (
     <>
@@ -74,7 +70,7 @@ export default function GeneralSettingsModal(_props: SettingsModalProps): JSX.El
           }}
         />
       </Flex>
-      <Divider my="sm" />
+      {/* <Divider my="sm" />
       <Flex align="center" style={{ width: "100%" }} justify="space-between">
         <Text>HiDPI</Text>
         <Switch
@@ -83,7 +79,7 @@ export default function GeneralSettingsModal(_props: SettingsModalProps): JSX.El
             setUseHiDPI(event.currentTarget.checked)
           }}
         />
-      </Flex>
+      </Flex> */}
     </>
   )
 }

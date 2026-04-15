@@ -5,7 +5,7 @@ import { fontInfo as cozetteFontInfo } from "./data/shape/text/cozette/font"
 import type { Engine, QuerySelection } from "./engine"
 import EngineWorker from "./engine?worker&inline"
 import { PointerMode } from "./types"
-import { UID } from "./utils"
+import { scaleDOMRect, UID } from "./utils"
 
 export * as constants from "./constants"
 export * as data from "./data"
@@ -82,6 +82,7 @@ export class Renderer {
         if (name === "hidpi") {
           this.resize()
         }
+        this.sendFontData()
         return true
       },
     },
@@ -116,7 +117,6 @@ export class Renderer {
       .init(Comlink.transfer(offscreenCanvasGL, [offscreenCanvasGL]), {
         attributes,
         container: this.CONTAINER.getBoundingClientRect(),
-        dpr: this.canvasSettings.dpr,
       })
       .then(() => {
         this.resize()
@@ -183,29 +183,28 @@ export class Renderer {
     canvas.style.top = "0px"
     canvas.style.left = "0px"
     canvas.style.pointerEvents = "none"
-    canvas.style.zIndex = "100"
+    canvas.style.zIndex = "0"
     this.CONTAINER.appendChild(canvas)
     return canvas
   }
 
   private resize(): void {
     const { width, height } = this.CONTAINER.getBoundingClientRect()
-    const dpr = this.canvasSettings.dpr
 
     this.canvasGL.style.width = `${String(width)}px`
     this.canvasGL.style.height = `${String(height)}px`
     // Only update engine bounding box and DPR - engine will resize offscreen canvas
-    this.engine.interface.update_engine_bounding_box(this.CONTAINER.getBoundingClientRect(), dpr)
+    this.engine.interface.update_engine_bounding_box(scaleDOMRect(this.CONTAINER.getBoundingClientRect(), this.canvasSettings.dpr))
 
     this.managedViews.forEach((node) => {
-      this.engine.interface.update_view_box_from_dom_rect(node.id, node.getBoundingClientRect())
+      this.engine.interface.update_view_box_from_dom_rect(node.id, scaleDOMRect(node.getBoundingClientRect(), this.canvasSettings.dpr))
     })
   }
 
   public async pollViews(): Promise<void> {
     if (this.destroyed) return
     this.managedViews.forEach((node) => {
-      this.engine.interface.update_view_box_from_dom_rect(node.id, node.getBoundingClientRect())
+      this.engine.interface.update_view_box_from_dom_rect(node.id, scaleDOMRect(node.getBoundingClientRect(), this.canvasSettings.dpr))
     })
     requestAnimationFrame(() => this.pollViews())
   }
@@ -233,10 +232,10 @@ export class Renderer {
      * @param e MouseEvent
      * @returns [x, y] coordinates relative to the canvas. Y axis is flipped. [0,0] is bottom-left corner. Similar to WebGL coordinates.
      */
-    function getMouseCanvasCoordinates(e: MouseEvent): [number, number] {
+    const getMouseCanvasCoordinates = (e: MouseEvent): [number, number] => {
       // Get the mouse position relative to the canvas
-      const { x, y, height } = element.getBoundingClientRect()
-      return [e.clientX - x, height - (e.clientY - y)]
+      const { x, y, height } = scaleDOMRect(element.getBoundingClientRect(), this.canvasSettings.dpr)
+      return [e.clientX * this.canvasSettings.dpr - x, height - (e.clientY * this.canvasSettings.dpr - y)]
     }
 
     /**
@@ -255,7 +254,7 @@ export class Renderer {
       if (index !== -1) this.pointerCache.splice(index, 1)
     }
 
-    await engine.interface.update_view_box_from_dom_rect(element.id, element.getBoundingClientRect())
+    await engine.interface.update_view_box_from_dom_rect(element.id, scaleDOMRect(element.getBoundingClientRect(), this.canvasSettings.dpr))
 
     // Track the canvas start point of the current measurement for angle constraint
     let measureStartCanvas: [number, number] | null = null
@@ -281,14 +280,18 @@ export class Renderer {
 
     element.onwheel = async (e): Promise<void> => {
       try {
-        const { x: offsetX, y: offsetY, width, height } = element.getBoundingClientRect()
+        const { x: offsetX, y: offsetY, width, height } = scaleDOMRect(element.getBoundingClientRect(), this.canvasSettings.dpr)
         const settings = await engine.interface.read_engine_settings()
+
         const moveScale = this.canvasSettings.dpr
+        const mouseX = e.x * moveScale
+        const mouseY = e.y * moveScale
+        const mouseScrollY = e.deltaY * moveScale
 
         if (settings.ZOOM_TO_CURSOR) {
-          engine.interface.zoom_at_point(element.id, (e.x - offsetX) * moveScale, (e.y - offsetY) * moveScale, e.deltaY * moveScale)
+          engine.interface.zoom_at_point(element.id, mouseX - offsetX, mouseY - offsetY, mouseScrollY)
         } else {
-          engine.interface.zoom_at_point(element.id, width / 2, height / 2, e.deltaY * moveScale)
+          engine.interface.zoom_at_point(element.id, width / 2, height / 2, mouseScrollY)
         }
       } catch (err) {
         console.error("Wheel handler error:", err)
@@ -377,7 +380,12 @@ export class Renderer {
         sendPointerEvent(e, PointerEvents.POINTER_MOVE)
         const index = this.pointerCache.findIndex((cachedEv) => cachedEv.pointerId === e.pointerId)
         if (index !== -1) this.pointerCache[index] = e
+
         const moveScale = this.canvasSettings.dpr
+        const mouseX = e.clientX * moveScale
+        const mouseY = e.clientY * moveScale
+        const mouseMovementX = e.movementX * moveScale
+        const mouseMovementY = e.movementY * moveScale
 
         if (this.pointerSettings.mode === PointerMode.MEASURE) {
           element.style.cursor = "crosshair"
@@ -405,18 +413,18 @@ export class Renderer {
             )
             const zoomFactor = ((startDistance - endDistance) / this.pointerCache.length) * moveScale
             const settings = await engine.interface.read_engine_settings()
-            const { x: offsetX, y: offsetY, width, height } = element.getBoundingClientRect()
+            const { x: offsetX, y: offsetY, width, height } = scaleDOMRect(element.getBoundingClientRect(), this.canvasSettings.dpr)
             if (settings.ZOOM_TO_CURSOR) {
-              engine.interface.zoom_at_point(element.id, (e.x - offsetX) * moveScale, (e.y - offsetY) * moveScale, zoomFactor * moveScale)
+              engine.interface.zoom_at_point(element.id, mouseX - offsetX, mouseY - offsetY, zoomFactor)
             } else {
               engine.interface.zoom_at_point(element.id, width / 2, height / 2, zoomFactor)
             }
-            engine.interface.view_move(element.id, e.movementX / this.pointerCache.length, e.movementY / this.pointerCache.length)
+            engine.interface.view_move(element.id, mouseMovementX / this.pointerCache.length, mouseMovementY / this.pointerCache.length)
           } else {
             if (e.buttons == 4) {
-              await engine.interface.view_rotate(element.id, e.movementY * moveScale, e.movementX * moveScale)
+              await engine.interface.view_rotate(element.id, mouseMovementY, mouseMovementX)
             } else {
-              await engine.interface.view_move(element.id, e.movementX * moveScale, e.movementY * moveScale)
+              await engine.interface.view_move(element.id, mouseMovementX, mouseMovementY)
             }
           }
         }
@@ -455,26 +463,28 @@ export class Renderer {
   private sendFontData(): void {
     const f = new FontFace("cozette", `url(${cozetteFont})`)
     f.load().then((font) => {
+      const scale = this.canvasSettings.dpr
       document.fonts.add(font)
       const canvas = document.createElement("canvas")
       const context = canvas.getContext("2d")
       if (!context) throw new Error("Could not get 2d context")
-      canvas.width = cozetteFontInfo.textureSize[0]
-      canvas.height = cozetteFontInfo.textureSize[1]
-      context.font = `${cozetteFontInfo.fontSize[1]}px cozette`
+      canvas.width = cozetteFontInfo.textureSize[0] * scale
+      canvas.height = cozetteFontInfo.textureSize[1] * scale
+      context.font = `${cozetteFontInfo.fontSize[1] * scale}px cozette`
       context.fillStyle = "white"
       context.textBaseline = "top"
-      context.lineWidth = 3
+      context.lineWidth = 3 * scale
       context.strokeStyle = "black"
       const characters = Object.keys(cozetteFontInfo.characterLocation)
       for (let i = 0; i < characters.length; i++) {
         const char = characters[i]
-        context.strokeText(char, cozetteFontInfo.characterLocation[char].x, cozetteFontInfo.characterLocation[char].y)
-        context.fillText(char, cozetteFontInfo.characterLocation[char].x, cozetteFontInfo.characterLocation[char].y)
+        context.strokeText(char, cozetteFontInfo.characterLocation[char].x * scale, cozetteFontInfo.characterLocation[char].y * scale)
+        context.fillText(char, cozetteFontInfo.characterLocation[char].x * scale, cozetteFontInfo.characterLocation[char].y * scale)
       }
 
-      const imageData = context.getImageData(0, 0, cozetteFontInfo.textureSize[0], cozetteFontInfo.textureSize[1])
-      this.engine.initializeFontRenderer(imageData.data)
+      const imageData = context.getImageData(0, 0, cozetteFontInfo.textureSize[0] * scale, cozetteFontInfo.textureSize[1] * scale)
+      console.log("Font data sent to engine", imageData)
+      this.engine.initializeFontRenderer(imageData.data, this.canvasSettings.dpr)
 
       // download font image sample
       // const canvasUrl = canvas.toDataURL("image/png", 1);

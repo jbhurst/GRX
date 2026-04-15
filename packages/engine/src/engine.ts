@@ -122,6 +122,11 @@ export abstract class EngineInterface extends DataInterface {
     Engine.render()
   }
 
+  /**
+   * Get a view by ID
+   * @param viewId View ID
+   * @returns ViewRenderer instance
+   */
   private static _get_view(viewId: string): ViewRenderer {
     if (!Engine.views.has(viewId)) throw new Error(`View ${viewId} not found`)
     return Engine.views.get(viewId)!
@@ -141,18 +146,10 @@ export abstract class EngineInterface extends DataInterface {
   /**
    * Update engine bounding box
    * @param box Bounding Box (DOMRect)
-   * @param dpr Device Pixel Ratio
    */
-  public static update_engine_bounding_box(box: DOMRect, dpr: number): void {
-    // const width = box.width * dpr
-    // const height = box.height * dpr
-    box.width = box.width * dpr
-    box.height = box.height * dpr
-
-    Engine.dpr = dpr
-
+  public static update_engine_bounding_box(box: ViewBox): void {
     let boxChanged = false
-    const keys: (keyof DOMRect)[] = ["x", "y", "width", "height", "top", "left", "right", "bottom"]
+    const keys: (keyof ViewBox)[] = ["x", "y", "width", "height"]
     for (const key of keys) {
       if (box[key] !== Engine.boundingBox[key]) {
         boxChanged = true
@@ -175,15 +172,12 @@ export abstract class EngineInterface extends DataInterface {
   /**
    * Update view box for a view from a DOMRect
    * @param viewId update view's viewbox
-   * @param viewBox view box (DomRect)
    */
-  public static update_view_box_from_dom_rect(viewId: string, viewBox: DOMRect): void {
-    const dpr = Engine.dpr
-    // Convert DOM coordinates to canvas coordinates with DPI scaling
-    viewBox.y = Engine.boundingBox.height - viewBox.bottom * dpr + Engine.boundingBox.y
-    viewBox.x = (viewBox.x - Engine.boundingBox.x / dpr) * dpr
-    viewBox.width = viewBox.width * dpr
-    viewBox.height = viewBox.height * dpr
+  public static update_view_box_from_dom_rect(viewId: string, viewBox: ViewBox): void {
+    // Convert DOM coordinates to canvas coordinates
+    // viewBox.y = Engine.boundingBox.height - viewBox.bottom + Engine.boundingBox.y
+    viewBox.y = Engine.boundingBox.height - (viewBox.y + viewBox.height) + Engine.boundingBox.y
+    viewBox.x = viewBox.x - Engine.boundingBox.x
 
     const view = EngineInterface._get_view(viewId)
     view.updateViewBox(viewBox)
@@ -476,7 +470,6 @@ export abstract class EngineInterface extends DataInterface {
 export interface EngineInitParams {
   attributes?: WebGLContextAttributes | undefined
   container: DOMRect
-  dpr: number
 }
 
 export abstract class Engine {
@@ -485,8 +478,7 @@ export abstract class Engine {
   public static regl: REGL.Regl
   private static universe: REGL.DrawCommand<REGL.DefaultContext>
   public static views: Map<string, ViewRenderer> = new Map()
-  public static boundingBox: DOMRect
-  public static dpr: number = 1
+  public static boundingBox: ViewBox
   public static pointer: Pointer = {
     x: 0,
     y: 0,
@@ -498,9 +490,8 @@ export abstract class Engine {
   // public loadingFrame: LoadingAnimation
   // public measurements: SimpleMeasurement
 
-  public static init(offscreenCanvasGL: OffscreenCanvas, { attributes, container, dpr }: EngineInitParams): void {
+  public static init(offscreenCanvasGL: OffscreenCanvas, { attributes, container }: EngineInitParams): void {
     Engine.offscreenCanvasGL = offscreenCanvasGL
-    Engine.dpr = dpr
     Engine.boundingBox = {
       ...container,
     }
@@ -586,8 +577,8 @@ export abstract class Engine {
     }
   }
 
-  public static initializeFontRenderer(fontData: Uint8ClampedArray): void {
-    initializeFontRenderer(Engine.regl, fontData)
+  public static initializeFontRenderer(fontData: Uint8ClampedArray, dpr: number): void {
+    initializeFontRenderer(Engine.regl, fontData, dpr)
   }
 
   public static renderDispatch = (): void => Engine.render()
